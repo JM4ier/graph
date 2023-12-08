@@ -1,7 +1,9 @@
 use std::{
-    collections::VecDeque,
-    ops::{Index, IndexMut},
+    collections::{BinaryHeap, VecDeque},
+    ops::{Add, Index, IndexMut},
 };
+
+use num::Num;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct NodeRef {
@@ -207,5 +209,57 @@ impl<N> Graph<N, i32> {
     }
     pub fn min_cut(&self, from: NodeRef, to: NodeRef) -> i32 {
         self.max_flow(from, to)
+    }
+}
+
+impl<N, E: PartialEq + PartialOrd + Num + Clone> Graph<N, E> {
+    pub fn shortest_path(&self, from: NodeRef, to: NodeRef) -> Option<E> {
+        let mut dist = vec![None; self.nodes.len()];
+
+        #[derive(PartialEq)]
+        struct DistanceNode<E> {
+            dist: E,
+            idx: usize,
+        }
+
+        impl<E: PartialEq> Eq for DistanceNode<E> {}
+
+        impl<E: PartialEq + PartialOrd> PartialOrd for DistanceNode<E> {
+            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                self.dist.partial_cmp(&other.dist)
+            }
+        }
+
+        impl<E: PartialEq + PartialOrd> Ord for DistanceNode<E> {
+            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                self.partial_cmp(other).unwrap()
+            }
+        }
+
+        let mut pq = BinaryHeap::new();
+        pq.push(DistanceNode {
+            dist: E::zero(),
+            idx: from.idx,
+        });
+
+        while let Some(DistanceNode { dist: d, idx }) = pq.pop() {
+            if dist[idx].is_some() {
+                // already visited
+                continue;
+            }
+
+            dist[idx] = Some(d);
+
+            for n in self.adjacency[idx] {
+                if dist[n.node.idx].is_none() {
+                    pq.push(DistanceNode {
+                        dist: d + self.edges[n.edge.idx],
+                        idx: n.node.idx,
+                    })
+                }
+            }
+        }
+
+        dist[to.idx]
     }
 }
